@@ -131,6 +131,11 @@ function plainProgressTracker() {
 async function getInputFiles(paths) {
   const validFiles = [];
 
+  // Reading from STDIN more than once doesn't make sense, so only check the first arg.
+  if (paths[0] === '-') {
+    paths[0] = '/dev/stdin';
+  }
+
   for (const inputPath of paths) {
     const files = (await fsp.lstat(inputPath)).isDirectory()
       ? (await fsp.readdir(inputPath, { withFileTypes: true }))
@@ -295,6 +300,7 @@ async function processBatch(files, progressTracker, threadCount, results) {
 
 program
   .name('squoosh-cli')
+  .usage('<files...> or - to read from STDIN')
   .arguments('<files...>')
   .option('-d, --output-dir <dir>', 'Output directory', '.')
   .option('-s, --suffix <suffix>', 'Append suffix to output files', '')
