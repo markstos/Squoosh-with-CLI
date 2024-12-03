@@ -279,7 +279,10 @@ async function processBatch(files, progressTracker, threadCount, results) {
           program.opts().suffix,
       );
       for (const output of Object.values(image.encodedWith)) {
-        const outputFile = `${outputPath}.${(await output).extension}`;
+        let outputFile = `${outputPath}.${(await output).extension}`;
+        if (program.opts().stdout) {
+          outputFile = '/dev/stdout';
+        }
         await fsp.writeFile(outputFile, (await output).binary);
         results
           .get(image)
@@ -304,6 +307,7 @@ program
   .arguments('<files...>')
   .option('-d, --output-dir <dir>', 'Output directory', '.')
   .option('-s, --suffix <suffix>', 'Append suffix to output files', '')
+  .option('--stdout', 'Write single file to STDOUT instead of --output-dir')
   .option(
     '-c, --max-concurrent-files <count>',
     'Amount of files to process at once (defaults to CPU cores)',
@@ -322,13 +326,24 @@ program
   .action((files) => {
     const outputDir = program.opts().outputDir;
     const maxConcurrentFiles = parseInt(program.opts().maxConcurrentFiles);
-    fs.mkdir(outputDir, { recursive: true }, async (error) => {
-      if (error) {
-        console.error(error);
-        return process.exit(1);
+
+    // Maybe write to STDOUT. Otherwise an output dir.
+    if (program.opts().stdout) {
+      if (files.length != 1) {
+        console.error(
+          '--stdout option only make sense with a single input file.',
+        );
       }
-      await processAllFiles(files, maxConcurrentFiles);
-    });
+      processAllFiles(files, maxConcurrentFiles);
+    } else {
+      fs.mkdir(outputDir, { recursive: true }, async (error) => {
+        if (error) {
+          console.error(error);
+          return process.exit(1);
+        }
+        await processAllFiles(files, maxConcurrentFiles);
+      });
+    }
   });
 
 // Create a CLI option for each supported preprocessor
